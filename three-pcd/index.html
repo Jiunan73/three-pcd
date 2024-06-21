@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PCD Viewer</title>
+    <style>
+        body {
+            margin: 0;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        #upload-container {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="upload-container">
+        <input type="file" id="pcd-upload" accept=".pcd" />
+        <span id="file-name">未选择文件</span>
+        <button id="clear-scene">清除场景</button>
+    </div>
+    <script src="./three.min.js"></script>
+    <script src="./PCDLoader.js"></script>
+    <script src="./OrbitControls.js"></script>
+    <script src="./pcl.js"></script>
+    <script>
+        // 获取上传按钮和画布元素
+        const pcdUpload = document.getElementById('pcd-upload');
+        const fileNameLabel = document.getElementById('file-name');
+        const clearSceneButton = document.getElementById('clear-scene');
+        let points1;
+        //const points1 =new THREE.Points();
+        // 设置场景、摄像头和渲染器
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setClearColor(new THREE.Color(5 / 255, 20 / 255, 39 / 255));
+        document.body.appendChild(renderer.domElement);
+
+        // 设置控制器
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.addEventListener('change', () => renderer.render(scene, camera));
+
+        // 设置光源
+        const light = new THREE.AmbientLight(0xffffff);
+        scene.add(light);
+
+        // 设置摄像头位置
+       
+        camera.position.z = 50;
+        // 创建PCD加载器
+        const pcdLoader = new THREE.PCDLoader();
+        const pointCloudMaterial = new THREE.PointsMaterial({
+            size: 0.02,
+            vertexColors :true,
+            opacity: 0.4,
+            depthWrite: false,
+            transparent: true,
+        });
+        const pointCloudMaterial_Red = new THREE.PointsMaterial({
+            size: 0.2,
+            color: 0xff0000,
+            opacity: 0.5,
+            transparent: true,
+            
+        });
+        init();
+        // 处理上传的PCD文件
+       
+        function init() {
+            pcdLoader.load( './pcd/MAP4F.pcd', function ( points ) {
+                //points.geometry.center();
+                //const passThrough = new pcl.filters.PassThrough();
+                //points1=points;
+               
+              
+
+                console.log(points);
+                points.geometry.rotateX( -Math.PI/2 );
+                
+                //points.geometry.rotateY( -Math.PI/2 )
+                //points.material = pointCloudMaterial;
+                //points.name = 'MAP4F.pcd';
+                console.log("Number of points:", points.geometry.attributes.position.count);
+                let positions = new Float32Array(points.geometry.attributes.position.count);
+                let colors = new Float32Array(points.geometry.attributes.position.count);
+                let positions_red = new Float32Array(points.geometry.attributes.position.count);
+                let idx=0;
+                let idx_red=0;
+                for (let i = 0; i < points.geometry.attributes.position.count; i++) {
+                    let x = points.geometry.attributes.position.getX(i);
+                    let y = points.geometry.attributes.position.getY(i);
+                    let z = points.geometry.attributes.position.getZ(i);
+                    y=y+x*0.037-1.6;
+                    if (i<5){
+                
+                        console.log("z:",z);}
+                    //X <50 y 是高度
+                    if ( x > 50 && y > 0 && y < 2.6) {
+
+                        if (z < -7.5) 
+                        {
+                            //牆壁外刪除 -7.5
+                     
+                            positions[idx*3]=x;
+                            positions[idx*3+1]=y;
+                            positions[idx*3+2]=z;
+                            colors [idx*3]=0.4*y ; //R
+                            colors [idx*3+1]=1;//G
+                            colors[idx*3+2]=0;//B
+
+                            idx++;  
+                         }
+                         else
+                         {
+    
+                            positions_red[idx_red*3]=x;
+                            positions_red[idx_red*3+1]=y;
+                            positions_red[idx_red*3+2]=z;
+                            idx_red++;  
+                         }
+                        //const point = new THREE.Vector3(x, y, z)
+                        //geometry.vertices.push(point)
+                        //points.geometry.attributes.position.setX(i,0);
+                        //points.geometry.attributes.position.setZ(i,0);
+                        //points.geometry.attributes.position.setY(i,0);
+                        //console.log("x:",z);
+                    }
+                    
+                }
+                positions = positions.slice(0, idx * 3);
+                colors = colors.slice(0, idx * 3);
+                // 分割點雲數據為兩半
+                console.log("idx Number of points:", idx);
+                console.log("idx_red Number of points:", idx_red);
+                const geometry = new THREE.BufferGeometry()
+                const geometry_red = new THREE.BufferGeometry()
+                geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+                geometry_red.setAttribute('position', new THREE.BufferAttribute(positions_red, 3));
+                points1 = new THREE.Points(geometry, pointCloudMaterial)
+                points2 = new THREE.Points(geometry_red, pointCloudMaterial_Red)
+                scene.add( points1 );
+                //scene.add( points2 );
+                console.log(points1);
+                points1.position.set(-100, 0, 0);
+                points2.position.set(-100, 0, 0);
+               // scene.add( points2 );
+                //scene.add( points );
+                //const gui = new GUI();
+                //gui.add( points.material, 'size', 0.01, 1 ).onChange( render );
+                //gui.addColor( points.material, 'color' ).onChange( render );
+                //gui.open();
+                //render();
+            } );
+        }
+        // 创建一个函数来清除场景中的点云
+        function clearPointClouds() {
+            for (const object of scene.children.slice()) {
+                if (object instanceof THREE.Points) {
+                    scene.remove(object);
+                }
+            }
+        }
+
+        // 为清除场景按钮添加点击事件监听器
+        clearSceneButton.addEventListener('click', () => {
+            clearPointClouds();
+            renderer.render(scene, camera);
+            fileNameLabel.textContent = '未选择文件';
+        });
+
+        // 渲染场景
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+            //console.log(camera.position);
+        }
+
+        animate();
+    </script>
+
+</body>
+
+</html>
